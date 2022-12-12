@@ -1,0 +1,146 @@
+#!/bin/bash
+#~ItzSelenux
+
+c0='\033[0;31m'
+c1='\033[0;32m'
+NC='\033[0m'
+ls='mkdir src product'
+
+help()
+{
+   printf "Croak Package Creator Help
+Options: 
+    make
+    -M  Make a package
+    genbase
+    -G  create a base recipe
+ "
+}
+
+createpkg()
+{
+#Check if Makefiles files exist
+####################################
+if [ -d src ]; then
+			printf "${c0}ERROR:${NC} Make Files already exist, please clean the directory\n"
+			exit
+else 
+    :
+fi
+#Check if croackrcp files exist
+####################################
+if [ -f croakrcp ]; then
+		:
+else 
+    printf "${c0}ERROR:${NC} croackrcp not found \n"
+		exit
+fi
+
+source ./croakrcp
+
+mkdir src product
+prodir=$(readlink -f product)
+srcdir=$(readlink -f src)
+initdir=$(readlink -f .)
+
+cd src
+
+printf "	${c1}Cloning data...${NC} \n"
+if [[ $clonetype == git ]]; then
+  git clone --depth 1 $src
+
+elif [[ $clonetype == curl ]]; then
+  curl -O $src
+
+else
+  printf "${c0}ERROR:${NC} Unknown clonetype\n Please use ${c1}git${NC} or ${c1}curl\n"
+  rm -r src product
+  exit
+fi
+
+if [[ $shatype == none ]]; then
+  printf "	${c1}skipping integrity verification...${NC} \n"
+else
+  shaverif
+fi
+
+
+printf "	${c1}Building package...${NC} \n"
+build
+printf "	${c1}Compressing package...${NC} \n"
+cd $prodir
+mkdir -p var/croak/pkginfo/$pkgname/
+pkgdata
+mv pkginfo var/croak/pkginfo/$pkgname/
+mv .pkginfo var/croak/pkginfo/$pkgname/
+: > var/croak/pkginfo/$pkgname/tracking
+tar cvfJ 0.0 * > tracking
+rm 0.0
+mv tracking var/croak/pkginfo/$pkgname/tracking
+tar cvfJ $initdir/$pkgname-$pkgver.croak *
+exit
+}
+
+shaverif()
+{
+printf "		${c1}Verifying integrity...${NC} \n"
+shadata=$($shatype $shafile)
+
+if [[ $shadata == $sha ]]; then
+  printf "${c1}	Integrity OK ${NC} \n"
+else
+  printf "${c0} ERROR: Integrity Verification failed${NC} \n"
+	rm -r $srcdir $prodir
+  exit
+fi
+}
+
+pkgdata()
+{
+
+pkgsize=$(cd .. && du -ch product/ | grep total | cut -c 1-4)
+echo "  Name:     $pkgname"  >> pkginfo
+echo "  Version:  $pkgver"   >> pkginfo
+echo "  Size:     $pkgsize"  >> pkginfo
+echo "  License:  $license"  >> pkginfo
+echo "  WebPage:  $webpage"  >> pkginfo
+echo "  Packager: $packager" >> pkginfo
+echo "  Depends:  $depends"  >> pkginfo
+echo "  Arch:     $arch"     >> pkginfo
+
+echo pkgname=$pkgname  >> .pkginfo
+echo pkgver=$pkgver    >> .pkginfo
+echo pkgsize=$pkgsize  >> .pkginfo
+echo depends=$depends  >> .pkginfo
+echo arch=$arch        >> .pkginfo
+}
+
+genbase()
+{
+cp /usr/share/croakrcp .
+}
+
+
+ 
+if [ -z "$1" ]; then
+createpkg
+exit
+fi
+
+
+case "${1}" in
+   createpkg)
+      createpkg;;
+   genbase)
+      genbase;;
+esac
+
+while getopts ":mg" option; do
+   case $option in
+      m) 
+         createpkg
+         exit;;
+      g) 
+         genbase
+         exit;;
+esac done

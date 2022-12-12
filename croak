@@ -1,0 +1,183 @@
+#!/bin/bash
+#~ItzSelenux
+c0='\033[0;31m'
+c1='\033[0;32m'
+NC='\033[0m'
+ls='mkdir src product'
+tarname=$2
+
+help()
+{
+   printf "Croak Package Manager Help
+Options: 
+    install
+    -i  install a package
+    remove
+    -r  remove a package
+    query
+    -q  query installed packages
+ "
+
+}
+
+stripname()
+{
+##Delete croak extension
+####################################
+pkgname=$(echo $tarname | rev | cut -c 6- | rev)
+
+##delete numbers, points and hyphens
+####################################
+IFS=0123456789.- 
+set -f
+pkgname=$(printf %s $pkgname)
+}
+
+usercheck()
+{
+if [ $(id -u) == 0 ]; then
+	:
+else
+	printf "${c0}ERROR:${NC} you need to be root to this operation \n"
+  exit
+fi
+}
+
+checkout()
+{
+
+if [ -z "$2" ]; then
+printf "${c0}ERROR:${NC} install requires an argument\n"
+exit
+fi
+
+usercheck
+##Create and read tempdata
+####################################
+mkdir -p /tmp/croak/0.0 
+printf "	${c1}Loading package info...${NC} \n"
+tar xf $tarname -C /tmp/croak/0.0/
+
+##Get pkgname and fetch .pkginfo variables
+####################################
+stripname 
+source /tmp/croak/0.0/var/croak/pkginfo/$pkgname/.pkginfo
+
+##Check correct architecture
+####################################
+if [[ $(uname -m) == $arch ]]; then
+  printf "	${c1}Arch: Correct architecture $arch ${NC} \n"
+else
+  printf "	${c0}ERROR:${NC} trying to install $arch package on $(uname -m) system ${NC} \n"
+	exit
+fi
+
+##Check correct architecture
+####################################
+if [[ -z $(ls $depends 2> /dev/null) ]]; then
+	  printf "	${c0}ERROR:${NC} Unfulfilled dependencies  \n"
+		ls $depends
+    exit
+else
+:
+fi
+
+##Show information
+####################################
+printf "┌───────── Package Information ───────────────┐\n"
+cat /tmp/croak/0.0/var/croak/pkginfo/$pkgname/pkginfo
+printf "└─────────────────────────────────────────────┘\n"
+
+
+printf "	Do you want to install ${c1}$pkgname${NC}? y/n/\n"
+	read answer
+if [ x$answer = x"y" ]
+then
+	printf "	Installing ${c1}$pkgname${NC}... \n"
+	installpkg
+elif [ x${answer} = x"n" ]
+	then
+	printf "	${c0} Operation cancelled by user ${NC}\n"
+	exit
+else
+	printf "	${c0} ??? unknown option '$answer', cancelling... ${NC}\n"
+fi
+}
+
+installpkg()
+{
+cp -rv /tmp/croak/0.0/. /
+}
+
+preremove()
+
+{
+
+printf "	Do you want to REMOVE ${c1}$tarname${NC}? y/n/\n"
+	read answer
+if [ x$answer = x"y" ]
+then
+	printf "	Removing ${c0}$pkgname${NC}... \n"
+	#remove
+	printf "		done\n"
+elif [ x${answer} = x"n" ]
+	then
+	printf "	${c1} Operation cancelled by user ${NC}\n"
+	exit
+else
+	printf "	${c0} ??? unknown option '$answer', cancelling... ${NC}\n"
+fi
+
+
+ 
+
+}
+
+remove()
+
+{
+unalias rm 2>/dev/null
+}
+
+query()
+
+{
+if [ -z "$tarname" ]; then
+	ls -1 /var/croak/pkginfo/ 2>/dev/null
+	exit
+else
+	ls -1 /var/croak/pkginfo/ | grep $tarname
+	exit
+fi
+
+}
+
+if [ -z "$1" ]; then
+printf "${c0}ERROR:${NC} No arguments specified\n"
+exit
+fi
+
+
+
+case "${1}" in
+   install)
+      checkout;;
+   remove)
+      remove;;
+   query)
+      remove;;
+esac
+
+while getopts ":irq" option; do
+   case $option in
+      i) 
+         checkout
+         exit;;
+      r) 
+         remove
+         exit;;
+
+      q) 
+         query
+         exit;;
+esac done

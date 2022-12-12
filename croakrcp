@@ -1,0 +1,19 @@
+packager='ItzSelenux'
+pkgname='proot'
+pkgver='5.3.1'
+license='GPL'
+webpage='https://proot-me.github.io/'
+depends='/bin/talloc'
+arch='x86_64'
+clonetype='curl'
+src='https://proot.gitlab.io/proot/bin/proot'
+shatype='sha256sum'
+shafile='proot'
+sha='b7f2adf5a225000a164f4905aabefeebe11c4c1d5bedff5e1fe8866c48dd70d2  proot'
+
+build() 
+{
+	install -dm755 "${prodir}"/usr/bin
+	install -m755 ${srcdir}/proot "${prodir}"/usr/bin
+}
+
