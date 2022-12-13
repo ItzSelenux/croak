@@ -1,0 +1,6 @@
+##########Croack package manager sources File#######
+
+repo=https://itzselenux.github.io/frogverse/x86_64/
+askroot=0
+alwaysupdate=0
+su=doas

@@ -2,20 +2,30 @@
 #~ItzSelenux
 c0='\033[0;31m'
 c1='\033[0;32m'
+c2='\033[0;33m'
 NC='\033[0m'
-ls='mkdir src product'
 tarname=$2
+source /var/croak/rc/croakrc
+unalias ls 2>/dev/null
 
 help()
 {
    printf "Croak Package Manager Help
 Options: 
     install
-    -i  install a package
+    -i  install a local package
     remove
     -r  remove a package
+    update 
+    -u update a package
+    download 
+    -d download a package
     query
     -q  query installed packages
+    about
+    -a check specific package information
+    files 
+    -f check installed package files
  "
 
 }
@@ -35,40 +45,53 @@ pkgname=$(printf %s $pkgname)
 
 usercheck()
 {
+if [ $askroot == 1 ]; then 
+rs=$su
+else
 if [ $(id -u) == 0 ]; then
 	:
 else
-	printf "${c0}ERROR:${NC} you need to be root to this operation \n"
+	printf "${c0}ERROR:${NC} you need to be ${c2}root${NC} to this operation \n"
   exit
+fi
 fi
 }
 
 checkout()
 {
+if [ -f $tarname ]; then
+	:
+else
+	printf "${c0}ERROR:${NC} ${c2}$tarname${NC} file does not exist\n"
+	exit
+fi
 
-if [ -z "$2" ]; then
-printf "${c0}ERROR:${NC} install requires an argument\n"
+
+if [ -z "$tarname" ]; then
+printf "${c0}ERROR:${NC} ${c2}install${NC} requires an argument\n\n"
+help
 exit
 fi
 
 usercheck
 ##Create and read tempdata
 ####################################
-mkdir -p /tmp/croak/0.0 
+mkdir -p /tmp/croak/pkg 
 printf "	${c1}Loading package info...${NC} \n"
-tar xf $tarname -C /tmp/croak/0.0/
+tar xf $tarname -C /tmp/croak/pkg/
 
 ##Get pkgname and fetch .pkginfo variables
 ####################################
 stripname 
-source /tmp/croak/0.0/var/croak/pkginfo/$pkgname/.pkginfo
+source /tmp/croak/pkg/var/croak/pkginfo/$pkgname/.pkginfo
+whinput=/tmp/croak/pkg/var/croak/pkginfo/$pkgname/tracking
 
 ##Check correct architecture
 ####################################
 if [[ $(uname -m) == $arch ]]; then
-  printf "	${c1}Arch: Correct architecture $arch ${NC} \n"
+  printf "	${c1}Arch: Correct architecture: ${c2}$arch ${NC} \n"
 else
-  printf "	${c0}ERROR:${NC} trying to install $arch package on $(uname -m) system ${NC} \n"
+  printf "	${c0}ERROR:${NC} trying to install ${c2}$arch${NC} package on ${c2}$(uname -m)${NC} system ${NC} \n"
 	exit
 fi
 
@@ -85,58 +108,92 @@ fi
 ##Show information
 ####################################
 printf "┌───────── Package Information ───────────────┐\n"
-cat /tmp/croak/0.0/var/croak/pkginfo/$pkgname/pkginfo
+cat /tmp/croak/pkg/var/croak/pkginfo/$pkgname/pkginfo
 printf "└─────────────────────────────────────────────┘\n"
 
 
-printf "	Do you want to install ${c1}$pkgname${NC}? y/n/\n"
+printf "	Do you want to install ${c2}$pkgname${NC}? y/n/\n"
 	read answer
 if [ x$answer = x"y" ]
 then
-	printf "	Installing ${c1}$pkgname${NC}... \n"
+
 	installpkg
 elif [ x${answer} = x"n" ]
 	then
 	printf "	${c0} Operation cancelled by user ${NC}\n"
 	exit
 else
-	printf "	${c0} ??? unknown option '$answer', cancelling... ${NC}\n"
+	printf "	${c0} ??? unknown option ${c2}'$answer'${c0}, cancelling... ${NC}\n"
 fi
+}
+
+checkfiles()
+{
+cd /
+while read -d $'\n'; do
+    ls -pd "${REPLY}" 2>/dev/null | grep -v /$
+done < /$whinput
+#ls -pd $(cat /tmp/croak/pkg/var/croak/pkginfo/proot/tracking) | grep -v /$
 }
 
 installpkg()
 {
-cp -rv /tmp/croak/0.0/. /
+	printf "	${c1} Checking for file conflicts... ${NC}\n"
+if [ -z $(checkfiles) 2>/dev/null ]; then
+	printf "	${c1} No file conflicts! ${NC}\n"
+else
+	printf "${c0}ERROR:Files already exist filesystem:\n${c2}"
+	checkfiles	
+	exit
+fi
+	printf "	Installing ${c2}$pkgname${NC}... \n"
+$rs cp -rvl /tmp/croak/pkg/. /
 }
 
 preremove()
-
 {
+if [ -z "$tarname" ]; then
+printf "${c0}ERROR:${NC} ${c2}remove${NC} requires an argument\n\n"
+help
+exit
+fi
 
-printf "	Do you want to REMOVE ${c1}$tarname${NC}? y/n/\n"
+if [ -d /var/croak/pkginfo/$tarname/ ]; then
+	:
+else
+	printf "${c0}ERROR:${NC} ${c2}$tarname${NC} not found on installed packages list\n"
+	exit
+fi
+
+usercheck
+
+printf "┌───────── Package Information ───────────────┐\n"
+cat /var/croak/pkginfo/$tarname/pkginfo
+printf "└─────────────────────────────────────────────┘\n"
+
+printf "	Do you want to REMOVE ${c2}$tarname${NC}? y/n/\n"
 	read answer
 if [ x$answer = x"y" ]
 then
 	printf "	Removing ${c0}$pkgname${NC}... \n"
-	#remove
-	printf "		done\n"
+	remove
 elif [ x${answer} = x"n" ]
 	then
 	printf "	${c1} Operation cancelled by user ${NC}\n"
 	exit
 else
-	printf "	${c0} ??? unknown option '$answer', cancelling... ${NC}\n"
+	printf "	${c0} ??? unknown option ${c2}'$answer'${c0}, cancelling... ${NC}\n"
 fi
-
-
- 
-
 }
 
 remove()
 
 {
+
 unalias rm 2>/dev/null
+cd /
+$rs rm -v 2>/dev/null $(cat /var/croak/pkginfo/$tarname/tracking)
+$rs rm -r /var/croak/pkginfo/proot
 }
 
 query()
@@ -149,35 +206,134 @@ else
 	ls -1 /var/croak/pkginfo/ | grep $tarname
 	exit
 fi
+}
+
+about()
+{
+if [ -d /var/croak/pkginfo/$tarname/ ]; then
+	:
+else
+	printf "${c0}ERROR:${NC} ${c2}$tarname${NC} not found on installed packages list\n"
+	exit
+fi
+
+if [ -z "$tarname" ]; then
+	printf "${c0}ERROR:${NC} ${c2}about${NC} requires an argument\n\n"
+	help
+	exit
+else
+	printf "┌───────── Package Information ───────────────┐\n"
+	cat /var/croak/pkginfo/$tarname/pkginfo
+	printf "└─────────────────────────────────────────────┘\n"
+	exit
+fi
+}
+
+files()
+{
+if [ -d /var/croak/pkginfo/$tarname/ ]; then
+	:
+else
+	printf "${c0}ERROR:${NC} ${c2}$tarname${NC} not found on installed packages list\n"
+	exit
+fi
+
+if [ -z "$tarname" ]; then
+	printf "${c0}ERROR:${NC} No arguments specified\n"
+	exit
+else
+	printf "───────── Package Files ─────────────────────\n"
+	checkfiles
+	printf "─────────────────────────────────────────────\n"
+	exit
+fi
+}
+
+downd()
+{
+if [ -z "$tarname" ]; then
+printf "${c0}ERROR:${NC} ${c2}download${NC} requires an argument\n\n"
+	help
+	exit
+fi
+
+printf "	${c1}Retrieving data...${NC} \n"
+curl -o /tmp/croak/d/ $repo/$tarname
+checkout
+
+}
+
+search()
+{
+if [ -z "$tarname" ]; then
+cat /var/croak/rc/croakdb | rev | cut -c 7- | rev
+	exit
+fi
+cat /var/croak/rc/croakdb | grep $tarname | rev | cut -c 7- | rev
+}
+
+update()
+{
+usercheck
+if [ -z "$tarname" ]; then
+$rs curl -o /var/croak/rc/croakdb $repo/croakdb
+	exit
+fi
+
+printf "	${c1}Retrieving data...${NC} \n"
 
 }
 
 if [ -z "$1" ]; then
 printf "${c0}ERROR:${NC} No arguments specified\n"
-exit
+	help
+	exit
 fi
 
-
-
 case "${1}" in
+   about)
+      about;;
+   download)
+      downd;;
+   files)
+      files;;
    install)
       checkout;;
    remove)
-      remove;;
+      preremove;;
    query)
-      remove;;
+      query;;
+   search)
+      search;;
 esac
 
-while getopts ":irq" option; do
+while getopts ":adfirqbsu" option; do
    case $option in
-      i) 
+      a) 
+         about
+         exit;; 
+      d) 
+         download
+         exit;;
+      f) 
+         files
+         exit;;     
+			i) 
          checkout
          exit;;
       r) 
-         remove
+         preremove
          exit;;
-
       q) 
          query
+         exit;;
+      s) 
+         search
+         exit;;
+      u) 
+         update
+         exit;;
+      b) 
+         ls -shp -1 *.croak > croakdb
          exit;;
 esac done
