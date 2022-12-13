@@ -22,8 +22,20 @@ createpkg()
 #Check if Makefiles files exist
 ####################################
 if [ -d src ]; then
-			printf "${c0}ERROR:${NC} Make Files already exist, please clean the directory\n"
+	printf "${c0}ERROR:${NC} Make Files already exist, please clean the directory\n"
+	printf "	clean current dir? y/n/\n"
+		read answer
+		if [ x$answer = x"y" ]
+		then
+			cleandir
+		elif [ x${answer} = x"n" ]
+		then
+			printf "	${c0} Operation cancelled by user ${NC}\n"
 			exit
+			else
+			printf "	${c0} ??? unknown option ${c2}'$answer'${c0}, cancelling... ${NC}\n"
+			exit
+		fi
 else 
     :
 fi
@@ -111,7 +123,7 @@ echo "  Arch:     $arch"     >> pkginfo
 echo pkgname=$pkgname  >> .pkginfo
 echo pkgver=$pkgver    >> .pkginfo
 echo pkgsize=$pkgsize  >> .pkginfo
-echo depends=$depends  >> .pkginfo
+echo depends="\"$depends\""  >> .pkginfo
 echo arch=$arch        >> .pkginfo
 }
 
@@ -120,7 +132,11 @@ genbase()
 cp /usr/share/croakrcp .
 }
 
-
+cleandir()
+{
+shopt -s extglob
+$(rm -r !(croakrcp))
+}
  
 if [ -z "$1" ]; then
 createpkg
@@ -133,14 +149,19 @@ case "${1}" in
       createpkg;;
    genbase)
       genbase;;
+   cleandir)
+      genbase;;
 esac
 
-while getopts ":mg" option; do
+while getopts ":cmg" option; do
    case $option in
       m) 
          createpkg
          exit;;
       g) 
          genbase
+         exit;;
+      c) 
+         cleandir
          exit;;
 esac done

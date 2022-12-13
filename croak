@@ -5,7 +5,7 @@ c1='\033[0;32m'
 c2='\033[0;33m'
 NC='\033[0m'
 tarname=$2
-source /var/croak/rc/croakrc
+source /etc/croakrc
 unalias ls 2>/dev/null
 
 help()
@@ -45,6 +45,8 @@ pkgname=$(printf %s $pkgname)
 
 usercheck()
 {
+##ask if ask for root password and if user is root
+####################################
 if [ $askroot == 1 ]; then 
 rs=$su
 else
@@ -59,6 +61,7 @@ fi
 
 checkout()
 {
+
 if [ -f $tarname ]; then
 	:
 else
@@ -72,6 +75,14 @@ printf "${c0}ERROR:${NC} ${c2}install${NC} requires an argument\n\n"
 help
 exit
 fi
+
+if [ $(ls $tarname| rev | cut -c -6 | rev) == .croak ]; then
+:
+else
+printf "${c0}ERROR:${NC} you need to use a ${c2}.croak${NC} file\n\n"
+exit
+fi
+
 
 usercheck
 ##Create and read tempdata
@@ -88,7 +99,7 @@ whinput=/tmp/croak/pkg/var/croak/pkginfo/$pkgname/tracking
 
 ##Check correct architecture
 ####################################
-if [[ $(uname -m) == $arch ]]; then
+if [[ $(uname -m) == $arch ]] || [ $arch == any ]; then
   printf "	${c1}Arch: Correct architecture: ${c2}$arch ${NC} \n"
 else
   printf "	${c0}ERROR:${NC} trying to install ${c2}$arch${NC} package on ${c2}$(uname -m)${NC} system ${NC} \n"
@@ -97,9 +108,9 @@ fi
 
 ##Check correct architecture
 ####################################
-if [[ -z $(ls $depends 2> /dev/null) ]]; then
+if [[ -z $(ls -pd $depends 2> /dev/null) ]]; then
 	  printf "	${c0}ERROR:${NC} Unfulfilled dependencies  \n"
-		ls $depends
+		ls -pd $depends
     exit
 else
 :
@@ -192,8 +203,7 @@ remove()
 
 unalias rm 2>/dev/null
 cd /
-$rs rm -v 2>/dev/null $(cat /var/croak/pkginfo/$tarname/tracking)
-$rs rm -r /var/croak/pkginfo/proot
+$rs rm -v 2>/dev/null $(cat /var/croak/pkginfo/$tarname/tracking) && rm -r /var/croak/pkginfo/proot
 }
 
 query()
@@ -266,17 +276,17 @@ checkout
 search()
 {
 if [ -z "$tarname" ]; then
-cat /var/croak/rc/croakdb | rev | cut -c 7- | rev
+cat /etc/croakdb | rev | cut -c 7- | rev
 	exit
 fi
-cat /var/croak/rc/croakdb | grep $tarname | rev | cut -c 7- | rev
+cat /etc/croakdb | grep $tarname | rev | cut -c 7- | rev
 }
 
 update()
 {
 usercheck
 if [ -z "$tarname" ]; then
-$rs curl -o /var/croak/rc/croakdb $repo/croakdb
+$rs curl -o /etc/croakdb $repo/croakdb
 	exit
 fi
 
